@@ -1,0 +1,71 @@
+[
+  {
+    "input": "Repository: acme/accounts\nIssue number: 118\nTitle: Password reset tokens remain valid after use\n\nBody:\nAfter a user successfully resets their password, the same reset token can be\nsubmitted again and changes the password a second time. A reset token must be\ninvalidated immediately after the first successful reset. Add a regression test\ncovering reuse of a consumed token.\n\nLabels:\nbug, security\n\nRelevant comments:\nComment by maintainer: Existing unused tokens must continue to expire after 30\nminutes. Do not change the expiration window.",
+    "output": {
+      "summary": "Prevent reuse of consumed password reset tokens.",
+      "problem_statement": "A password reset token remains valid after a successful password reset, allowing the token to change the password more than once.",
+      "requirements": [
+        "Invalidate a password reset token immediately after its first successful use.",
+        "Preserve the existing 30-minute expiration behavior for unused tokens.",
+        "Add regression coverage for attempted reuse of a consumed token."
+      ],
+      "acceptance_criteria": [
+        "The first valid submission of a password reset token successfully resets the password.",
+        "A second submission of the same consumed token is rejected and does not change the password.",
+        "An unused reset token continues to expire after 30 minutes.",
+        "Automated tests cover reuse of a consumed token."
+      ],
+      "in_scope": [
+        "Reset-token invalidation after successful use.",
+        "Regression tests for consumed-token reuse."
+      ],
+      "out_of_scope": [
+        "Changing the 30-minute expiration window for unused tokens."
+      ],
+      "assumptions": [],
+      "open_questions": [],
+      "risks": [
+        {
+          "folder": null,
+          "description": "Failure to invalidate tokens atomically could leave a race condition that permits concurrent reuse.",
+          "severity": "high"
+        }
+      ],
+      "is_actionable": true,
+      "actionability_reason": "The faulty behavior, required behavior, preserved behavior, and regression-test expectation are explicit."
+    }
+  },
+  {
+    "input": "Repository: acme/storefront\nIssue number: 203\nTitle: Make product search better\n\nBody:\nSearch feels slow and the results are not very good. Improve it.\n\nLabels:\nenhancement\n\nRelevant comments:\nComment by product-owner: Customers should find what they want more easily.",
+    "output": {
+      "summary": "Improve product-search performance and result quality, pending clarification of measurable targets.",
+      "problem_statement": "The issue reports that product search feels slow and returns unsatisfactory results, but does not define the affected queries or expected behavior.",
+      "requirements": [
+        "Improve product-search response time.",
+        "Improve the relevance of product-search results."
+      ],
+      "acceptance_criteria": [],
+      "in_scope": [
+        "Product-search performance.",
+        "Product-search result relevance."
+      ],
+      "out_of_scope": [],
+      "assumptions": [],
+      "open_questions": [
+        "What response-time target or baseline defines an acceptable performance improvement?",
+        "Which queries currently produce poor results?",
+        "How should result relevance be measured or ranked?",
+        "Does the issue apply to all product searches or a specific search surface?"
+      ],
+      "risks": [
+        {
+          "folder": null,
+          "description": "Implementing without measurable relevance and latency targets could produce a change that cannot be objectively accepted.",
+          "severity": "medium"
+        }
+      ],
+      "is_actionable": false,
+      "actionability_reason": "The issue lacks measurable performance targets, examples of incorrect results, and a definition of expected relevance."
+    }
+  }
+]

@@ -1,0 +1,29 @@
+# API and server
+fastapi[standard-no-fastapi-cloud-cli]
+pydantic-settings
+sse-starlette
+
+# Agent orchestration
+langchain
+langgraph
+langgraph-checkpoint-sqlite
+langchain-openai
+
+# GitHub integration
+httpx
+PyJWT[crypto]
+
+# Persistence and configuration
+sqlalchemy[asyncio]
+aiosqlite
+PyYAML
+
+# Logging
+structlog
+
+# Testing and code quality
+pytest
+pytest-asyncio
+pytest-cov
+respx
+ruff
