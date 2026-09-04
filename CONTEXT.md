@@ -11,10 +11,23 @@ current project workspace, run development checks, and update project
 documentation when the user requests that work.
 
 **Chief**:
-The only agent that communicates with the user. Chief plans the work, assigns
-bounded tasks, starts and stops workers, monitors errors, reviews diffs and test
-results, and asks the user for decisions. Chief has no source-edit capability
-and does not integrate changes into `main`.
+The supervisor that communicates with the user and controls delegation. Chief
+receives the planner's approved artifacts, assigns bounded tasks, starts and
+stops workers, monitors errors, reviews diffs and test results, and asks the
+user for decisions. Chief has no source-edit capability and does not integrate
+changes into `main`.
+
+**Planner agent**:
+A LangGraph/API-backed planning agent that deeply explores a repository and
+creates a validated issue brief, repository map, or implementation plan. A
+Planner agent is read-only. It may use local repository tools and approved
+read-only GitHub-native exploration tools. It does not implement code or run as
+a Runtime worker.
+
+**Planner graph**:
+The LangGraph control-plane workflow that runs Planner agents for issue
+analysis, repository exploration, implementation planning, human approval, and
+plan revision. It produces the artifacts that Chief uses for delegation.
 
 **Worker**:
 A sub-agent assigned one bounded task by Chief. A worker may read repository
@@ -22,8 +35,14 @@ evidence, edit files, run checks, and commit changes only on its own worker
 branch and worktree.
 
 **Runtime worker**:
-A Worker process launched by Chief during a supervised run. Its current
-directory is its assigned worktree, not the Chief project workspace.
+A Codex or Claude process launched by Chief during a supervised run. It is not
+an API agent or a LangGraph node. Its current directory is its assigned
+worktree, not the Chief project workspace.
+
+**Provider worker**:
+A Runtime worker started through a provider adapter for Codex or Claude. The
+provider changes the launch mechanism, but not the WorkerTask, safety rules,
+required Skill process, or WorkerResult contract.
 
 **User**:
 The human authority for approval and integration. The user selects or combines
@@ -158,9 +177,16 @@ A reviewed, portable copy of a skill and its supporting files stored with the
 project. It changes only after an explicit refresh.
 
 **Skill route**:
-The rule that selects the skills available to one agent. Chief follows the
-skills invoked during human discussion; every Runtime worker has the required
-implementation route `implement → tdd → code-review`, plus conditional skills.
+The rule that selects the skills available to one agent. Planner agents follow
+the skills invoked during human discussion. Every Runtime worker has the
+required implementation route `implement → tdd → code-review`, plus
+conditional skills.
+
+**GitHub exploration tool set**:
+The least-privilege, read-only GitHub-native capabilities available to Planner
+agents for remote issues, pull requests, files, commits, branches, checks, and
+repository metadata. These tools are scoped to the target repository and do
+not create issues, comments, branches, commits, or pull requests.
 
 **Chief tool**:
 A structured capability that lets Chief supervise, inspect, and record a run
