@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 
-from schemas.runtime import WorkerResult
+from agents.tools.runtime_tools import WorktreeGuard
+from schemas.runtime import WorkerAssignment, WorkerResult
 
 REQUIRED_WORKER_PIPELINE = (
     ("implement", "started"),
@@ -22,7 +23,11 @@ class SkillTraceDecision:
 class SkillTraceGate:
     """Check the required Runtime worker process before result acceptance."""
 
-    def check(self, result: WorkerResult) -> SkillTraceDecision:
+    def check(
+        self,
+        result: WorkerResult,
+        assignment: WorkerAssignment | None = None,
+    ) -> SkillTraceDecision:
         completed = {
             (trace.skill, trace.phase)
             for trace in result.skill_trace
@@ -34,6 +39,22 @@ class SkillTraceGate:
             if (skill, phase) not in completed
         ]
         violations = []
+        if result.status != "completed":
+            violations.append("Only completed WorkerResults can be accepted.")
+        if assignment is not None:
+            if result.run_id != assignment.run_id:
+                violations.append("WorkerResult run does not match its assignment.")
+            if result.worker_id != assignment.worker_id:
+                violations.append("WorkerResult worker does not match its assignment.")
+            if result.task_id != assignment.task_id:
+                violations.append("WorkerResult task does not match its assignment.")
+            for path in result.changed_files:
+                try:
+                    in_scope = WorktreeGuard(assignment).path_is_assigned(path)
+                except ValueError:
+                    in_scope = False
+                if not in_scope:
+                    violations.append(f"Changed file is outside assigned scope: {path}")
         sequences = [trace.sequence for trace in result.skill_trace]
         if sequences != sorted(sequences):
             violations.append("Skill trace sequence is not ordered.")

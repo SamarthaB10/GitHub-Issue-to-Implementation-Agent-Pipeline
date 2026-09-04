@@ -134,6 +134,9 @@ Your assigned scope is:
 Use the Runtime worker tools for file edits, approved checks, queue updates,
 and Git actions. Keep all product changes inside the assigned scope. Report
 progress and errors through your sub-agent queue.
+Write the final WorkerResult JSON to:
+
+`{assignment.worktree_path}/.chief-worker/result.json`
 
 ## Required work method
 
@@ -166,6 +169,7 @@ worker_branch: {assignment.branch}
 base_commit: {assignment.base_commit}
 worker_queue: {assignment.worktree_path}/.chief-worker/sub_agent_queue.md
 authoritative_queue: {assignment.project_workspace}/.chief/workers/{assignment.worker_id}/sub_agent_queue.md
+result_path: {assignment.worktree_path}/.chief-worker/result.json
 project_context: CONTEXT.md
 skill_catalog: docs/skills/INDEX.md
 required_skills: {", ".join(required_skills) or "None"}

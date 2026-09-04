@@ -7,6 +7,7 @@ from langchain_openai import ChatOpenAI
 
 from agents.graph.state import AgentState
 from agents.shared import load_prompt
+from agents.tools.github_tools import GitHubClient, build_github_exploration_tools
 from agents.tools.python_tools import build_python_tools
 from agents.tools.repository_tools import build_repository_tools
 from schemas.repository import RepositoryMap
@@ -29,8 +30,13 @@ REPOSITORY_EXPLORER_TASK_PROMPT = ChatPromptTemplate.from_messages(
 )
 
 
-def build_repository_explorer(repository_path: str):
-    """Build an explorer whose tools are confined to one repository."""
+def build_repository_explorer(
+    repository_path: str,
+    *,
+    github_repository: str | None = None,
+    github_client: GitHubClient | None = None,
+):
+    """Build an explorer with local tools and optional scoped GitHub reads."""
 
     model_name = os.getenv("OPENAI_MODEL")
 
@@ -50,6 +56,13 @@ def build_repository_explorer(repository_path: str):
         *build_repository_tools(repository_path),
         *build_python_tools(repository_path),
     ]
+    if github_repository:
+        tools.extend(
+            build_github_exploration_tools(
+                github_repository,
+                client=github_client,
+            )
+        )
 
     return create_agent(
         model=model,
@@ -79,7 +92,10 @@ async def repository_explorer_node(state: AgentState) -> dict:
         repository=state["issue"].repository,
         issue_brief=issue_brief.model_dump_json(indent=2),
     )
-    explorer = build_repository_explorer(state["repository_path"])
+    explorer = build_repository_explorer(
+        state["repository_path"],
+        github_repository=state["issue"].repository,
+    )
     result = await explorer.ainvoke(
         {"messages": task_messages},
         config={"recursion_limit": 30},

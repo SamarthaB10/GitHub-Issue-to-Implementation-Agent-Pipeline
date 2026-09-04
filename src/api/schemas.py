@@ -43,3 +43,48 @@ class RunResponse(BaseModel):
     pending_nodes: list[str]
     interrupt: dict[str, Any] | None = None
     completed: bool
+
+
+class ChiefHandoffResponse(BaseModel):
+    """Result of handing approved Planner artifacts to Chief."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    run_id: str
+    status: str
+    task_ids: list[str]
+    repository_path: str
+
+
+class ChiefEventsResponse(BaseModel):
+    """Durable Chief events for one run."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    run_id: str
+    events: list[dict[str, Any]]
+
+
+class ChiefDelegationRequest(BaseModel):
+    """Provider selection for one Chief delegation request."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    provider: str = Field(default="codex", pattern="^(codex|claude)$")
+
+
+class ChiefDelegationResponse(BaseModel):
+    """Worker assignments created by Chief."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    run_id: str
+    assignments: list[dict[str, Any]]
+
+
+class CreateHandoffRequest(BaseModel):
+    """Input needed to export an approved Planner run."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    base_commit: str = Field(min_length=1)

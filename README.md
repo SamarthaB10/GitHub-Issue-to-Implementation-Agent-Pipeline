@@ -5,11 +5,11 @@ human-approved implementation plan. The project combines LangGraph orchestration
 structured LLM outputs, read-only repository tools, checkpointed approval, and an
 asynchronous FastAPI interface.
 
-> **Current milestone:** the planning graph and the first Runtime foundation are
-> implemented. The foundation provides Chief tickets, durable SQLite state,
-> worker context files, guarded worktree tools, and Skill-trace validation.
-> Full worker process launch, recovery, and pull-request publication are planned
-> for a later milestone.
+> **Current milestone:** the Planner-to-Chief handoff and the first supervised
+> Runtime worker loop are implemented. The system provides read-only GitHub
+> exploration, durable SQLite state, isolated worktrees, Codex/Claude command
+> adapters, worker context files, bounded runtime tools, recovery discovery,
+> and Skill-trace validation. Pull-request publication remains human-controlled.
 
 ## Why this project exists
 
@@ -22,6 +22,10 @@ each stage produces a validated artifact for the next one:
 3. Inspect the repository using bounded, read-only tools.
 4. Build an evidence-based implementation plan.
 5. Pause for a human to approve, revise, or cancel the plan.
+6. Export the approved plan to Chief.
+7. Chief creates dependency-aware WorkerTasks and isolated worker branches.
+8. Codex or Claude workers implement, test, review, and return Skill traces.
+9. Chief produces an integration report for the human.
 
 ## Architecture
 
@@ -44,6 +48,9 @@ The workflow uses explicit LangGraph edges instead of making every role a ReAct
 agent. The issue analyst and implementation planner perform deterministic,
 schema-constrained generation. The repository explorer is the tool-using agent
 because it must iteratively search and inspect repository evidence.
+
+After approval, LangGraph stops. Chief owns delegation and supervision. Runtime
+workers are provider processes, not LangGraph nodes and not API agents.
 
 ## Agent roles
 
@@ -75,6 +82,14 @@ Safety controls include repository-root path validation, `.git` exclusion,
 binary and oversized-file rejection, output limits, fixed read-only subprocess
 commands, and no shell execution of model-provided commands.
 
+Planner agents can also receive scoped GitHub-native read-only tools for
+repository metadata, files at a ref, code and issue search, issue comments,
+pull requests and patches, commits and comparisons, branches, statuses, check
+runs, and workflow runs. These tools use GET requests only, limit pages and
+response sizes, and never create GitHub resources. `GITHUB_TOKEN` is optional
+and is read only from the local environment when supplied. Runtime workers do
+not receive this surface by default.
+
 ## Technology
 
 - Python 3.11+
@@ -95,10 +110,14 @@ src/
 │   │   ├── state.py           # Shared AgentState
 │   │   └── workflow.py        # LangGraph construction
 │   ├── chief.py                # Chief ticket and worker coordination
+│   ├── handoff.py              # Planner artifact export
+│   ├── lifecycle.py             # Runtime process supervision and recovery
+│   ├── providers.py             # Codex/Claude provider adapters
 │   ├── skill_catalog.py        # Portable skill snapshot catalog
 │   ├── state_store.py          # Project-local SQLite state
 │   ├── tools/
 │   │   ├── python_tools.py
+│   │   ├── github_tools.py      # Planner-only GitHub reads
 │   │   ├── repository_tools.py
 │   │   └── runtime_tools.py    # Guarded worker edit/check/Git tools
 │   ├── implementer.py         # Read-only implementation planner
@@ -106,9 +125,12 @@ src/
 │   ├── repo_explorer.py
 │   ├── worker_protocol.py      # Worker result and Skill-trace rules
 │   ├── worker_queue.py         # Append-only worker queue files
+│   ├── to_tickets.py            # Approved plan to WorkerTask conversion
+│   ├── worktrees.py             # Isolated worker branch creation
 │   └── shared.py               # Cached prompt loading
 ├── api/
 │   ├── app.py
+│   ├── chief_service.py
 │   ├── routes.py
 │   ├── schemas.py
 │   └── service.py
@@ -120,7 +142,8 @@ src/
     ├── approval.py
     ├── issue.py
     ├── planning.py
-    └── repository.py
+    ├── repository.py
+    └── runtime.py
 
 tests/unit/                     # Offline agent, graph, API, and tool tests
 ```
@@ -181,12 +204,30 @@ implement → tdd → code-review
 Workers return Skill traces with their result. Chief checks the traces before
 accepting the result. Skill snapshots are portable and contain no credentials.
 
-The current Runtime foundation is library-level. It can create a run, turn a
-plan into queue entries, persist state in `.chief/chief.sqlite3`, prepare a
-worker context bundle, apply hash-checked patches, run approved checks, inspect
-Git state, and accept or reject a worker result. A later milestone will connect
-these controls to worker process launch, terminal commands, recovery, and
-LangGraph fan-out.
+The Runtime loop is available through `chief_cli` and library interfaces. It can
+export an approved Planner state, create dependency-aware tickets, create
+isolated worktrees, prepare worker context, launch a configured Codex or Claude
+command with a sanitized environment, supervise timeout and stop events,
+discover assignments after restart, validate WorkerResults, and produce a
+human integration report. Chief never merges worker branches into `main`.
+
+## Chief CLI
+
+The local command boundary works from a cloned repository. The handoff file is
+the JSON returned by `POST /api/runs/THREAD_ID/handoff`.
+
+```bash
+PYTHONPATH=src python -m chief_cli handoff --file handoff.json
+PYTHONPATH=src python -m chief_cli delegate --file handoff.json --provider codex
+PYTHONPATH=src python -m chief_cli run --file handoff.json --provider claude
+PYTHONPATH=src python -m chief_cli status --project /absolute/project --run-id RUN_ID
+PYTHONPATH=src python -m chief_cli report --project /absolute/project --run-id RUN_ID
+```
+
+Set `CHIEF_CODEX_COMMAND` or `CHIEF_CLAUDE_COMMAND` when the local provider
+uses a different CLI command. Provider commands receive context through the
+worker directory and `CHIEF_*` environment variables. API keys are never
+stored in the repository or copied into worker environments.
 
 ## Clone and verify
 
@@ -279,6 +320,34 @@ curl -X POST http://127.0.0.1:8000/api/runs/THREAD_ID/decision \
 
 To stop a run instead, submit `{"action": "cancel"}`.
 
+### Export the approved plan
+
+After approval, export a versioned `PlannerHandoff` for Chief. Use the commit
+that should be the common base for all worker worktrees.
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/runs/THREAD_ID/handoff \
+  -H "Content-Type: application/json" \
+  -d '{"base_commit": "BASE_COMMIT"}' > handoff.json
+```
+
+### Give the handoff to Chief
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/chief/handoffs \
+  -H "Content-Type: application/json" \
+  --data-binary @handoff.json
+```
+
+Create worker branches and queues with the CLI, or use the API after the
+handoff has been accepted:
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/chief/runs/THREAD_ID/delegate \
+  -H "Content-Type: application/json" \
+  -d '{"provider": "codex"}'
+```
+
 ## State and status model
 
 Each run begins with an `IssueInput` and absolute `repository_path`. Nodes add
@@ -302,9 +371,11 @@ Important statuses include:
 - `plan_approved`
 - `cancelled`
 
-The default API uses LangGraph's in-memory checkpointer. A thread can be resumed
-while the server process remains alive, but state is lost when the process
-restarts.
+The Planner API uses LangGraph's in-memory checkpointer. A Planner thread can
+be resumed while the server process remains alive. After approval, Chief stores
+the handoff, tickets, assignments, events, and WorkerResults in
+`.chief/chief.sqlite3`; unfinished assignments can then be discovered after a
+Chief restart.
 
 ## Testing
 
@@ -324,22 +395,25 @@ repository-tool safety, and Python AST inspection.
 
 - GitHub issues are submitted through the API; webhook ingestion is not yet
   implemented.
-- The default checkpointer is in-memory rather than durable SQLite or Postgres.
-- Repository tools are read-only; the workflow does not modify source files.
-- Generated code is not yet executed in an isolated worktree or sandbox.
-- Automated test-runner, reviewer, retry-policy, and pull-request publisher
-  nodes are not yet implemented.
+- The Planner graph checkpointer is in-memory; Chief supervision state is
+  durable in `.chief/chief.sqlite3`.
+- Worker recovery discovers unfinished assignments after restart; it does not
+  attach to a provider process that was already running.
+- The provider command must be installed and configured on the user's machine.
+- GitHub webhook ingestion and pull-request publication are not implemented.
+- Final conflict resolution, merge, and release remain human actions.
 - Live-model evaluation and production telemetry are not yet included.
 
 The intended next-stage workflow is:
 
 ```text
-approved plan
-  → isolated Git worktree
-  → controlled code writer
-  → sandboxed test runner
-  → reviewer and bounded revision loop
-  → draft pull request
+approved Planner handoff
+  → Chief WorkerTasks
+  → isolated Git worktrees
+  → Codex or Claude Runtime worker
+  → implement → tdd → code-review
+  → Skill-trace gate
+  → human integration report
 ```
 
 ## Design principles

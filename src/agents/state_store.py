@@ -4,9 +4,15 @@ import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 
-from schemas.runtime import QueueEntry, WorkerAssignment, WorkerResult, WorkerTask
+from schemas.runtime import (
+    PlannerHandoff,
+    QueueEntry,
+    WorkerAssignment,
+    WorkerResult,
+    WorkerTask,
+)
 
-LATEST_SCHEMA_VERSION = 1
+LATEST_SCHEMA_VERSION = 2
 
 
 class StateStoreError(RuntimeError):
@@ -81,6 +87,32 @@ class ChiefStateStore:
             )
             self._insert_event(connection, task.run_id, "task_recorded", {"task_id": task.task_id})
 
+    def record_handoff(self, handoff: PlannerHandoff) -> None:
+        """Persist the validated Planner artifact bundle for a run."""
+
+        with self._connection() as connection:
+            self._require_run(connection, handoff.run_id)
+            connection.execute(
+                """
+                INSERT INTO planner_handoffs (run_id, payload_json, created_at)
+                VALUES (?, ?, ?)
+                ON CONFLICT(run_id) DO UPDATE SET
+                    payload_json = excluded.payload_json,
+                    created_at = excluded.created_at
+                """,
+                (
+                    handoff.run_id,
+                    self._dump(handoff.model_dump(mode="json")),
+                    self._now(),
+                ),
+            )
+            self._insert_event(
+                connection,
+                handoff.run_id,
+                "planner_handoff_recorded",
+                {"schema_version": handoff.schema_version},
+            )
+
     def record_worker(self, assignment: WorkerAssignment) -> None:
         with self._connection() as connection:
             self._require_run(connection, assignment.run_id)
@@ -125,6 +157,9 @@ class ChiefStateStore:
                 INSERT INTO worker_results
                     (run_id, worker_id, task_id, payload_json, created_at)
                 VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(run_id, worker_id, task_id) DO UPDATE SET
+                    payload_json = excluded.payload_json,
+                    created_at = excluded.created_at
                 """,
                 (
                     result.run_id,
@@ -169,11 +204,33 @@ class ChiefStateStore:
     def get_task(self, task_id: str) -> dict[str, object] | None:
         return self._get_payload("tasks", "task_id", task_id)
 
+    def get_handoff(self, run_id: str) -> dict[str, object] | None:
+        with self._connection() as connection:
+            row = connection.execute(
+                "SELECT payload_json FROM planner_handoffs WHERE run_id = ?",
+                (run_id,),
+            ).fetchone()
+        return json.loads(row[0]) if row else None
+
     def get_worker(self, worker_id: str) -> dict[str, object] | None:
         return self._get_payload("workers", "worker_id", worker_id)
 
     def get_queue_entry(self, queue_id: str) -> dict[str, object] | None:
         return self._get_payload("queue_entries", "queue_id", queue_id)
+
+    def tasks_for_run(self, run_id: str) -> list[dict[str, object]]:
+        return self._payloads_for_run("tasks", run_id)
+
+    def workers_for_run(self, run_id: str) -> list[dict[str, object]]:
+        return self._payloads_for_run("workers", run_id)
+
+    def worker_results_for_run(self, run_id: str) -> list[dict[str, object]]:
+        with self._connection() as connection:
+            rows = connection.execute(
+                "SELECT payload_json FROM worker_results WHERE run_id = ? ORDER BY created_at",
+                (run_id,),
+            ).fetchall()
+        return [json.loads(row[0]) for row in rows]
 
     def events_for_run(self, run_id: str) -> list[dict[str, object]]:
         with self._connection() as connection:
@@ -219,6 +276,11 @@ class ChiefStateStore:
                 payload_json TEXT NOT NULL,
                 PRIMARY KEY (run_id, task_id)
             );
+            CREATE TABLE IF NOT EXISTS planner_handoffs (
+                run_id TEXT PRIMARY KEY REFERENCES runs(run_id),
+                payload_json TEXT NOT NULL,
+                created_at TEXT NOT NULL
+            );
             CREATE TABLE IF NOT EXISTS workers (
                 worker_id TEXT NOT NULL,
                 run_id TEXT NOT NULL REFERENCES runs(run_id),
@@ -258,7 +320,11 @@ class ChiefStateStore:
         payload: dict[str, object],
     ) -> None:
         connection.execute(
-            f"INSERT INTO {table} ({key_name}, run_id, payload_json) VALUES (?, ?, ?)",
+            f"""
+            INSERT INTO {table} ({key_name}, run_id, payload_json)
+            VALUES (?, ?, ?)
+            ON CONFLICT DO UPDATE SET payload_json = excluded.payload_json
+            """,
             (key_value, run_id, ChiefStateStore._dump(payload)),
         )
 
@@ -299,6 +365,14 @@ class ChiefStateStore:
         if row is None:
             return None
         return json.loads(row[0])
+
+    def _payloads_for_run(self, table: str, run_id: str) -> list[dict[str, object]]:
+        with self._connection() as connection:
+            rows = connection.execute(
+                f"SELECT payload_json FROM {table} WHERE run_id = ?",
+                (run_id,),
+            ).fetchall()
+        return [json.loads(row[0]) for row in rows]
 
     @staticmethod
     def _dump(payload: dict[str, object]) -> str:
