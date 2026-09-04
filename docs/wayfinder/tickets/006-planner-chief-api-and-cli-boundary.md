@@ -13,9 +13,8 @@ clone usage.
 
 ## Status
 
-Open / unclaimed
+Resolved for MVP
 
 ## Blocked by
 
 - Planner-to-Chief Artifact Boundary
-

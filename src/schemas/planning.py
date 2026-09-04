@@ -22,6 +22,18 @@ class ImplementationStep(BaseModel):
     rationale: str = Field(
         description="Why this step is needed to satisfy the issue."
     )
+    depends_on: list[int] = Field(
+        default_factory=list,
+        description="Earlier step order values that must finish first.",
+    )
+
+    @model_validator(mode="after")
+    def dependencies_must_be_earlier_steps(self):
+        if len(set(self.depends_on)) != len(self.depends_on):
+            raise ValueError("Step dependencies must be unique.")
+        if any(dependency >= self.order or dependency < 1 for dependency in self.depends_on):
+            raise ValueError("Step dependencies must point to earlier steps.")
+        return self
 
 
 class PlannedTest(BaseModel):

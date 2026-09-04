@@ -13,5 +13,4 @@ environment behavior without binding core code to one provider.
 
 ## Status
 
-Open / unclaimed
-
+Resolved for MVP

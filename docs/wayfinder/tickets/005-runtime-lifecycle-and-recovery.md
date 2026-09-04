@@ -12,5 +12,4 @@ recover after Chief or worker restart?
 
 ## Status
 
-Open / unclaimed
-
+Resolved for MVP

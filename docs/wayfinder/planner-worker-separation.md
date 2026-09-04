@@ -42,20 +42,26 @@ roles.
 
 ## Decisions so far
 
-None. The human has confirmed the core separation, but no decision ticket has
-been resolved yet.
+The MVP resolves the map with these defaults:
+
+- Planner handoffs use schema version 1 and require an approved ready plan plus
+  a shared base commit.
+- GitHub Planner tools use bounded GET requests scoped to one repository and
+  optional ref. GitHub writes stay outside the Planner tool surface.
+- Codex and Claude use the same `WorkerProcess` contract and differ only in
+  their local CLI command adapter.
+- Chief stores assignments, events, handoffs, and results in SQLite. Worker
+  branches use isolated Git worktrees.
+- Every Runtime worker receives `sub_agents.md` and `context.agent`, then must
+  complete `implement → tdd → code-review` before Chief accepts its result.
+- Final branch integration remains a human action.
 
 ## Not yet specified
 
-- Exact Planner-to-Chief artifact and version boundary.
-- Exact least-privilege GitHub exploration tool set and how Planner access is
-  authenticated and scoped.
-- Provider-neutral launch contract for Codex and Claude.
-- Worker process lifecycle, isolation, timeout, cancellation, and recovery.
-- How live worker output and Skill traces reach Chief.
-- How Chief validates scope, checks, commits, and dependencies.
-- API and CLI entrypoints for Planner runs, approval, delegation, and results.
-- How final worker commits become a human-reviewed integration or pull request.
+- Provider process attach after an unexpected Chief restart.
+- GitHub webhook ingestion and pull-request publication.
+- Live streaming of provider stdout beyond bounded log files.
+- Human-selected conflict resolution and final pull-request workflow.
 
 ## Out of scope
 
@@ -63,4 +69,3 @@ been resolved yet.
 - Creating separate cleanup, testing, or review agent roles.
 - Storing provider credentials in the repository.
 - Fully autonomous merge or release without human approval.
-

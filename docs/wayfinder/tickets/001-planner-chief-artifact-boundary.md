@@ -13,5 +13,4 @@ approval status, and invalidation behavior.
 
 ## Status
 
-Open / unclaimed
-
+Resolved for MVP

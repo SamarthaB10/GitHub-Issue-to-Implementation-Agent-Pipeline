@@ -26,5 +26,4 @@ requests, merges, and other writes outside this capability.
 
 ## Status
 
-Open / unclaimed
-
+Resolved for MVP

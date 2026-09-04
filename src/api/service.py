@@ -4,6 +4,7 @@ from uuid import uuid4
 from fastapi.encoders import jsonable_encoder
 from langgraph.types import Command
 
+from agents.handoff import build_planner_handoff
 from api.schemas import RunResponse, StartRunRequest
 from schemas.approval import PlanApprovalDecision
 
@@ -76,6 +77,13 @@ class RunService:
             )
 
             return await self.get_run(thread_id)
+
+    async def create_handoff(self, thread_id: str, *, base_commit: str):
+        self._require_known_thread(thread_id)
+        snapshot = await self.graph.aget_state(self._config(thread_id))
+        state = dict(snapshot.values)
+        state["thread_id"] = thread_id
+        return build_planner_handoff(state, base_commit=base_commit)
 
     def _require_known_thread(self, thread_id: str) -> None:
         if thread_id not in self._known_threads:

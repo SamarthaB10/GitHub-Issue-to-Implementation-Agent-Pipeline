@@ -13,5 +13,4 @@ and the acceptance gate for `implement → tdd → code-review`.
 
 ## Status
 
-Open / unclaimed
-
+Resolved for MVP

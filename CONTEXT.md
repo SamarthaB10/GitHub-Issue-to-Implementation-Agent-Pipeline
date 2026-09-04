@@ -29,6 +29,12 @@ The LangGraph control-plane workflow that runs Planner agents for issue
 analysis, repository exploration, implementation planning, human approval, and
 plan revision. It produces the artifacts that Chief uses for delegation.
 
+**Planner handoff**:
+The versioned `PlannerHandoff` artifact containing the approved issue brief,
+repository map, implementation plan, approval decision, repository path, and
+shared base commit. Chief accepts only schema version 1 handoffs with an
+approved, ready plan.
+
 **Worker**:
 A sub-agent assigned one bounded task by Chief. A worker may read repository
 evidence, edit files, run checks, and commit changes only on its own worker
@@ -208,3 +214,13 @@ phases and their evidence for Chief to verify.
 **Sub-agent context bundle**:
 The `sub_agents.md` rules file and `context.agent` context file that Chief
 provides to every sub-agent before it starts.
+
+**Integration report**:
+The structured summary Chief gives the user after it accepts WorkerResults. It
+lists worker commits, changed files, overlaps, errors, and the next human
+action. It never performs a merge.
+
+**Provider adapter**:
+The small boundary that converts a Codex or Claude CLI choice into a common
+Runtime worker launch. It receives no repository secret and does not alter the
+WorkerTask or Skill protocol.

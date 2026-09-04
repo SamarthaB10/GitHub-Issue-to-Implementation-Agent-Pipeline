@@ -7,6 +7,7 @@ from api.service import RunService
 from schemas.issue import IssueBrief
 from schemas.planning import ImplementationPlan, ImplementationStep
 from schemas.repository import RelevantFile, RepositoryMap
+from tests.unit.test_handoff import make_handoff
 
 
 def make_brief() -> IssueBrief:
@@ -154,6 +155,21 @@ def test_approve_run(client, tmp_path):
     assert result["completed"] is True
 
 
+def test_approved_run_exports_a_planner_handoff(client, tmp_path):
+    started = start_run(client, str(tmp_path))
+    decision_url = f"/api/runs/{started['thread_id']}/decision"
+    assert client.post(decision_url, json={"action": "approve"}).status_code == 200
+
+    response = client.post(
+        f"/api/runs/{started['thread_id']}/handoff",
+        json={"base_commit": "abc1234"},
+    )
+
+    assert response.status_code == 200
+    assert response.json()["schema_version"] == 1
+    assert response.json()["plan_approval"]["action"] == "approve"
+
+
 def test_completed_run_rejects_another_decision(client, tmp_path):
     started = start_run(client, str(tmp_path))
     decision_url = f"/api/runs/{started['thread_id']}/decision"
@@ -189,3 +205,27 @@ def test_start_requires_absolute_existing_repository(client):
     )
 
     assert response.status_code == 422
+
+
+def test_chief_accepts_an_approved_planner_handoff_and_exposes_report(client, tmp_path):
+    handoff = make_handoff().model_copy(update={"repository_path": str(tmp_path)})
+
+    response = client.post(
+        "/api/chief/handoffs",
+        json=handoff.model_dump(mode="json"),
+    )
+
+    assert response.status_code == 200
+    assert response.json()["task_ids"] == ["run-1/step-1"]
+    report = client.get("/api/chief/runs/run-1/integration-report")
+    assert report.status_code == 200
+    assert report.json()["status"] == "blocked"
+    chief_status = client.get("/api/chief/runs/run-1")
+    assert chief_status.status_code == 200
+    assert chief_status.json()["tasks"][0]["task_id"] == "run-1/step-1"
+
+
+def test_chief_report_for_unknown_run_is_not_found(client):
+    response = client.get("/api/chief/runs/missing/integration-report")
+
+    assert response.status_code == 404

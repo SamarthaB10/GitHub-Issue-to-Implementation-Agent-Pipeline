@@ -1,7 +1,7 @@
 import pytest
 
 from agents.worker_protocol import SkillTraceGate
-from schemas.runtime import SkillTrace, WorkerResult
+from schemas.runtime import SkillTrace, WorkerAssignment, WorkerResult
 
 
 def trace(skill, phase, *, sequence=1, evidence=None, status="completed"):
@@ -84,3 +84,30 @@ def test_skill_trace_rejects_unknown_phase():
             status="completed",
             evidence={},
         )
+
+
+def test_skill_trace_gate_rejects_a_changed_file_outside_assignment_scope(tmp_path):
+    assignment = WorkerAssignment(
+        run_id="run-1",
+        worker_id="worker-1",
+        task_id="task-1",
+        project_workspace=str(tmp_path),
+        worktree_path=str(tmp_path / "worktree"),
+        branch="chief/run-1/worker-1",
+        base_commit="abc1234",
+        assigned_paths=["src/**"],
+    )
+    result = WorkerResult(
+        run_id="run-1",
+        worker_id="worker-1",
+        task_id="task-1",
+        status="completed",
+        commit="abc1234",
+        changed_files=["README.md"],
+        skill_trace=complete_trace(),
+    )
+
+    decision = SkillTraceGate().check(result, assignment)
+
+    assert decision.accepted is False
+    assert "outside assigned scope" in decision.violations[0]

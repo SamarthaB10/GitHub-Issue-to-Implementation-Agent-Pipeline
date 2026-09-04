@@ -1,6 +1,12 @@
+from pathlib import Path
 from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+
+from schemas.approval import PlanApprovalDecision
+from schemas.issue import IssueBrief
+from schemas.planning import ImplementationPlan
+from schemas.repository import RepositoryMap
 
 
 class WorkerAssignment(BaseModel):
@@ -23,6 +29,8 @@ class WorkerAssignment(BaseModel):
     protected_branches: list[str] = Field(
         default_factory=lambda: ["main", "master"]
     )
+    provider: Literal["codex", "claude"] = "codex"
+    timeout_seconds: int = Field(default=3_600, ge=1, le=86_400)
 
 
 class WorkerTask(BaseModel):
@@ -109,6 +117,55 @@ class WorkerResult(BaseModel):
     skill_trace: list[SkillTrace] = Field(default_factory=list)
     errors: list[str] = Field(default_factory=list)
     open_questions: list[str] = Field(default_factory=list)
+
+
+class PlannerHandoff(BaseModel):
+    """Versioned, approved planning artifacts handed to Chief."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    schema_version: Literal[1] = 1
+    run_id: str = Field(min_length=1)
+    repository: str = Field(min_length=1)
+    repository_path: str = Field(min_length=1)
+    base_commit: str = Field(min_length=1)
+    issue_brief: IssueBrief
+    repository_map: RepositoryMap
+    implementation_plan: ImplementationPlan
+    plan_approval: PlanApprovalDecision
+    approved_checks: list[list[str]] = Field(default_factory=list)
+    created_at: str = Field(min_length=1)
+
+    @field_validator("repository_path")
+    @classmethod
+    def repository_path_must_be_absolute(cls, value: str) -> str:
+        path = Path(value).expanduser()
+        if not path.is_absolute():
+            raise ValueError("repository_path must be absolute.")
+        return str(path.resolve())
+
+    @model_validator(mode="after")
+    def handoff_must_be_approved(self):
+        if self.plan_approval.action != "approve":
+            raise ValueError("Only approved plans can cross the Chief boundary.")
+        if not self.implementation_plan.ready_for_approval:
+            raise ValueError("Only ready plans can cross the Chief boundary.")
+        return self
+
+
+class IntegrationReport(BaseModel):
+    """Human-facing summary of accepted worker branches."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    run_id: str = Field(min_length=1)
+    status: Literal["ready_for_human", "blocked"]
+    accepted_workers: list[str] = Field(default_factory=list)
+    worker_commits: dict[str, str] = Field(default_factory=dict)
+    changed_files: dict[str, list[str]] = Field(default_factory=dict)
+    overlapping_files: list[str] = Field(default_factory=list)
+    errors: list[str] = Field(default_factory=list)
+    next_action: str = Field(min_length=1)
 
 
 class PatchResult(BaseModel):

@@ -13,9 +13,8 @@ that only the human integrates to `main`.
 
 ## Status
 
-Open / unclaimed
+Resolved for MVP
 
 ## Blocked by
 
 - Runtime Worker Lifecycle and Recovery
-

@@ -4,6 +4,7 @@ import pytest
 
 from agents.state_store import ChiefStateStore, StateStoreError
 from schemas.runtime import QueueEntry, WorkerAssignment, WorkerTask
+from tests.unit.test_handoff import make_handoff
 
 
 def make_task():
@@ -75,3 +76,16 @@ def test_state_store_rejects_unknown_future_schema(tmp_path):
 
     with pytest.raises(StateStoreError, match="newer schema"):
         ChiefStateStore(tmp_path).initialize()
+
+
+def test_state_store_persists_and_reopens_a_planner_handoff(tmp_path):
+    store = ChiefStateStore(tmp_path)
+    store.initialize()
+    store.create_run("run-1", base_commit="abc1234")
+    handoff = make_handoff()
+    handoff = handoff.model_copy(update={"repository_path": str(tmp_path)})
+
+    store.record_handoff(handoff)
+
+    reopened = ChiefStateStore(tmp_path)
+    assert reopened.get_handoff("run-1")["schema_version"] == 1
