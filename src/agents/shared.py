@@ -3,7 +3,6 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
-
 PROMPTS_ROOT = (Path(__file__).resolve().parent.parent / "prompts").resolve()
 
 
@@ -48,19 +47,19 @@ def load_prompt_examples(relative_path: str) -> list[dict[str, Any]]:
     raw_examples = json.loads(load_prompt(relative_path))
 
     if not isinstance(raw_examples, list):
-        raise ValueError("Few-shot prompt examples must be a JSON list.")
+        raise TypeError("Few-shot prompt examples must be a JSON list.")
 
     examples: list[dict[str, Any]] = []
 
     for index, example in enumerate(raw_examples):
         if not isinstance(example, dict):
-            raise ValueError(f"Prompt example {index} must be a JSON object.")
+            raise TypeError(f"Prompt example {index} must be a JSON object.")
 
         if not isinstance(example.get("input"), str):
-            raise ValueError(f"Prompt example {index} must contain string input.")
+            raise TypeError(f"Prompt example {index} must contain string input.")
 
         if not isinstance(example.get("output"), dict):
-            raise ValueError(f"Prompt example {index} must contain object output.")
+            raise TypeError(f"Prompt example {index} must contain object output.")
 
         examples.append(example)
 

@@ -10,7 +10,6 @@ from agents.tools.repository_tools import (
     _resolve_repository_file,
 )
 
-
 MAX_AST_ITEMS = 200
 
 

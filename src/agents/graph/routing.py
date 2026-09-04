@@ -2,7 +2,6 @@ from typing import Literal
 
 from agents.graph.state import AgentState
 
-
 IssueAnalysisRoute = Literal["explore", "needs_clarification"]
 ImplementationPlanRoute = Literal["review", "needs_clarification"]
 PlanApprovalRoute = Literal["approve", "request_changes", "cancel"]

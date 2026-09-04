@@ -13,7 +13,6 @@ from agents.graph.state import AgentState
 from agents.shared import load_prompt, load_prompt_examples
 from schemas.issue import IssueBrief, IssueInput
 
-
 load_dotenv()
 
 

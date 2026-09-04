@@ -1,11 +1,10 @@
 import json
 import subprocess
-import tomllib
 from collections import Counter
 from pathlib import Path
 
+import tomllib
 from langchain.tools import tool
-
 
 MAX_COMMAND_OUTPUT = 12_000
 MAX_LISTED_FILES = 500
@@ -273,13 +272,17 @@ def _parse_python_project(
     unique_dependencies = list(dict.fromkeys(dependencies))[:200]
     normalized_dependencies = [dependency.lower() for dependency in unique_dependencies]
 
-    if any("pytest" in dependency for dependency in normalized_dependencies):
-        if "pytest" not in python_context["test_frameworks"]:
-            python_context["test_frameworks"].append("pytest")
+    if (
+        any("pytest" in dependency for dependency in normalized_dependencies)
+        and "pytest" not in python_context["test_frameworks"]
+    ):
+        python_context["test_frameworks"].append("pytest")
 
-    if any(dependency.startswith("ruff") for dependency in normalized_dependencies):
-        if "ruff" not in python_context["lint_tools"]:
-            python_context["lint_tools"].append("ruff")
+    if (
+        any(dependency.startswith("ruff") for dependency in normalized_dependencies)
+        and "ruff" not in python_context["lint_tools"]
+    ):
+        python_context["lint_tools"].append("ruff")
 
     python_context["dependencies"] = unique_dependencies
     return python_context
