@@ -5,9 +5,10 @@ human-approved implementation plan. The project combines LangGraph orchestration
 structured LLM outputs, read-only repository tools, checkpointed approval, and an
 asynchronous FastAPI interface.
 
-> **Current milestone:** issue analysis, repository exploration, implementation
-> planning, and human approval are implemented. Code editing, test execution on
-> generated changes, automated review, and pull-request publication are planned
+> **Current milestone:** the planning graph and the first Runtime foundation are
+> implemented. The foundation provides Chief tickets, durable SQLite state,
+> worker context files, guarded worktree tools, and Skill-trace validation.
+> Full worker process launch, recovery, and pull-request publication are planned
 > for a later milestone.
 
 ## Why this project exists
@@ -93,13 +94,19 @@ src/
 │   │   ├── routing.py         # Conditional graph routes
 │   │   ├── state.py           # Shared AgentState
 │   │   └── workflow.py        # LangGraph construction
+│   ├── chief.py                # Chief ticket and worker coordination
+│   ├── skill_catalog.py        # Portable skill snapshot catalog
+│   ├── state_store.py          # Project-local SQLite state
 │   ├── tools/
 │   │   ├── python_tools.py
-│   │   └── repository_tools.py
+│   │   ├── repository_tools.py
+│   │   └── runtime_tools.py    # Guarded worker edit/check/Git tools
 │   ├── implementer.py         # Read-only implementation planner
 │   ├── issue_analyst.py
 │   ├── repo_explorer.py
-│   └── shared.py              # Cached prompt loading
+│   ├── worker_protocol.py      # Worker result and Skill-trace rules
+│   ├── worker_queue.py         # Append-only worker queue files
+│   └── shared.py               # Cached prompt loading
 ├── api/
 │   ├── app.py
 │   ├── routes.py
@@ -117,6 +124,11 @@ src/
 
 tests/unit/                     # Offline agent, graph, API, and tool tests
 ```
+
+The project also includes `AGENTS.md`, `CONTEXT.md`, and the portable skill
+catalog under `docs/skills/`. A Codex session or another coding agent can read
+these files after cloning the repository. Runtime workers receive generated
+`sub_agents.md` and `context.agent` files before they start work.
 
 ## Getting started
 
@@ -146,11 +158,51 @@ brew install ripgrep
 Create a local `.env` file:
 
 ```dotenv
-OPENAI_API_KEY=your-api-key
-OPENAI_MODEL=your-model-name
+OPENAI_API_KEY=
+OPENAI_MODEL=
 ```
 
-The `.env` file is ignored by Git and must never be committed.
+The `.env` file is ignored by Git and must never be committed. Never place a
+real API key, access token, or secret in the repository, a skill snapshot, or a
+Runtime sub-agent context file. Use `.env.example` as the safe template.
+
+## Agent skills and Runtime workers
+
+The reviewed project skill catalog is in
+[`docs/skills/INDEX.md`](docs/skills/INDEX.md). Chief uses the `to-tickets`
+skill to turn an approved plan into dependency-aware WorkerTask queue entries.
+Each Runtime worker receives `sub_agents.md` and `context.agent`, then follows
+the same implementation process:
+
+```text
+implement → tdd → code-review
+```
+
+Workers return Skill traces with their result. Chief checks the traces before
+accepting the result. Skill snapshots are portable and contain no credentials.
+
+The current Runtime foundation is library-level. It can create a run, turn a
+plan into queue entries, persist state in `.chief/chief.sqlite3`, prepare a
+worker context bundle, apply hash-checked patches, run approved checks, inspect
+Git state, and accept or reject a worker result. A later milestone will connect
+these controls to worker process launch, terminal commands, recovery, and
+LangGraph fan-out.
+
+## Clone and verify
+
+From a fresh clone, use the documented environment and run the offline checks:
+
+```bash
+python3.11 -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt
+PYTHONPATH=src python -m pytest -q
+ruff check src tests
+```
+
+Keep real model credentials in a local ignored `.env` file. The repository,
+skill snapshots, SQLite state, queue files, and worker context files must not
+contain API keys or other secrets.
 
 ### 4. Start the API
 

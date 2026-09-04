@@ -1,0 +1,143 @@
+from typing import Literal
+
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+
+class WorkerAssignment(BaseModel):
+    """The guarded Runtime scope assigned to one worker."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    run_id: str = Field(min_length=1)
+    worker_id: str = Field(min_length=1)
+    task_id: str = Field(min_length=1)
+    project_workspace: str = Field(min_length=1)
+    worktree_path: str = Field(min_length=1)
+    branch: str = Field(min_length=1)
+    base_commit: str = Field(min_length=1)
+    assigned_paths: list[str] = Field(min_length=1)
+    approved_checks: list[list[str]] = Field(default_factory=list)
+    required_skills: list[str] = Field(
+        default_factory=lambda: ["implement", "tdd", "code-review"]
+    )
+    protected_branches: list[str] = Field(
+        default_factory=lambda: ["main", "master"]
+    )
+
+
+class WorkerTask(BaseModel):
+    """A vertical-slice ticket that Chief assigns to one Runtime worker."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    run_id: str = Field(min_length=1)
+    task_id: str = Field(min_length=1)
+    title: str = Field(min_length=1)
+    description: str = Field(min_length=1)
+    blocked_by: list[str] = Field(default_factory=list)
+    acceptance_criteria: list[str] = Field(min_length=1)
+    assigned_paths: list[str] = Field(min_length=1)
+    required_checks: list[list[str]] = Field(default_factory=list)
+    required_skills: list[str] = Field(
+        default_factory=lambda: ["implement", "tdd", "code-review"]
+    )
+
+
+class QueueEntry(BaseModel):
+    """One append-only task or change request in a worker queue."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    queue_id: str = Field(min_length=1)
+    run_id: str = Field(min_length=1)
+    worker_id: str = Field(min_length=1)
+    sequence: int = Field(ge=1)
+    priority: Literal["immediate", "error_detection", "workflow"]
+    kind: Literal["task", "change_request"]
+    task_id: str = Field(min_length=1)
+    title: str = Field(min_length=1)
+    description: str = Field(min_length=1)
+    blocked_by: list[str] = Field(default_factory=list)
+    acceptance_criteria: list[str] = Field(default_factory=list)
+    assigned_paths: list[str] = Field(default_factory=list)
+    required_checks: list[list[str]] = Field(default_factory=list)
+    required_skills: list[str] = Field(default_factory=list)
+    supersedes_entry_id: str | None = None
+
+    @model_validator(mode="after")
+    def change_requests_must_point_to_an_entry(self):
+        if self.kind == "change_request" and not self.supersedes_entry_id:
+            raise ValueError(
+                "A change request must point to the queue entry it changes."
+            )
+        return self
+
+
+class SkillTrace(BaseModel):
+    """Evidence that a Runtime worker followed one part of its skill route."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    sequence: int = Field(ge=1)
+    skill: str = Field(min_length=1)
+    phase: Literal["started", "red", "green", "reviewed", "completed", "failed"]
+    status: Literal["started", "completed", "failed"]
+    evidence: dict[str, object] = Field(default_factory=dict)
+
+
+class CheckObservation(BaseModel):
+    """A named check reported by a Runtime worker."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1)
+    status: Literal["passed", "failed", "timed_out"]
+
+
+class WorkerResult(BaseModel):
+    """The evidence package a Runtime worker gives back to Chief."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    run_id: str = Field(min_length=1)
+    worker_id: str = Field(min_length=1)
+    task_id: str = Field(min_length=1)
+    status: Literal["completed", "failed", "blocked"]
+    commit: str | None = None
+    changed_files: list[str] = Field(default_factory=list)
+    checks: list[CheckObservation] = Field(default_factory=list)
+    skill_trace: list[SkillTrace] = Field(default_factory=list)
+    errors: list[str] = Field(default_factory=list)
+    open_questions: list[str] = Field(default_factory=list)
+
+
+class PatchResult(BaseModel):
+    """The result of one accepted Runtime patch."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    status: Literal["applied"]
+    changed_files: list[str]
+
+
+class CheckResult(BaseModel):
+    """The bounded result of one approved Runtime check."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    status: Literal["passed", "failed", "timed_out"]
+    argv: list[str]
+    exit_code: int | None
+    stdout: str
+    stderr: str
+
+
+class GitResult(BaseModel):
+    """A bounded result from a Runtime worker Git action."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    status: Literal["clean", "changes", "committed", "no_changes"]
+    branch: str
+    output: str = ""
+    commit: str | None = None

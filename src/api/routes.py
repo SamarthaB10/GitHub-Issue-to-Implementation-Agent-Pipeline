@@ -1,15 +1,19 @@
+from typing import Annotated
+
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
 from api.schemas import RunResponse, StartRunRequest
 from api.service import RunConflictError, RunNotFoundError, RunService
 from schemas.approval import PlanApprovalDecision
 
-
 router = APIRouter(prefix="/api")
 
 
 def get_run_service(request: Request) -> RunService:
     return request.app.state.run_service
+
+
+RunServiceDependency = Annotated[RunService, Depends(get_run_service)]
 
 
 @router.post(
@@ -19,7 +23,7 @@ def get_run_service(request: Request) -> RunService:
 )
 async def start_run(
     request: StartRunRequest,
-    service: RunService = Depends(get_run_service),
+    service: RunServiceDependency,
 ) -> RunResponse:
     return await service.start_run(request)
 
@@ -27,7 +31,7 @@ async def start_run(
 @router.get("/runs/{thread_id}", response_model=RunResponse)
 async def get_run(
     thread_id: str,
-    service: RunService = Depends(get_run_service),
+    service: RunServiceDependency,
 ) -> RunResponse:
     try:
         return await service.get_run(thread_id)
@@ -45,7 +49,7 @@ async def get_run(
 async def submit_plan_decision(
     thread_id: str,
     decision: PlanApprovalDecision,
-    service: RunService = Depends(get_run_service),
+    service: RunServiceDependency,
 ) -> RunResponse:
     try:
         return await service.submit_plan_decision(thread_id, decision)

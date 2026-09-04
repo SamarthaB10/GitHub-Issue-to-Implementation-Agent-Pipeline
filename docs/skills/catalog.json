@@ -1,0 +1,110 @@
+{
+  "version": 1,
+  "snapshot_policy": "Reviewed snapshots change only after explicit refresh.",
+  "skills": [
+    {
+      "name": "implement",
+      "description": "Implementation lifecycle for a ticket.",
+      "source": "local-agents/skills/implement",
+      "snapshot": "snapshots/implement",
+      "roles": ["chief", "runtime_worker"],
+      "required_for": ["runtime_worker"]
+    },
+    {
+      "name": "tdd",
+      "description": "Red-green test-first development process.",
+      "source": "local-agents/skills/tdd",
+      "snapshot": "snapshots/tdd",
+      "roles": ["chief", "runtime_worker"],
+      "required_for": ["runtime_worker"]
+    },
+    {
+      "name": "code-review",
+      "description": "Two-axis standards and specification review.",
+      "source": "local-agents/skills/code-review",
+      "snapshot": "snapshots/code-review",
+      "roles": ["chief", "runtime_worker"],
+      "required_for": ["runtime_worker"]
+    },
+    {
+      "name": "review-agent",
+      "description": "Read-only defect-first review of a code change.",
+      "source": "codex-system/skills/review-agent",
+      "snapshot": "snapshots/review-agent",
+      "roles": ["chief", "runtime_worker"],
+      "required_for": []
+    },
+    {
+      "name": "to-tickets",
+      "description": "Break a plan into dependency-aware vertical-slice tickets.",
+      "source": "local-agents/skills/to-tickets",
+      "snapshot": "snapshots/to-tickets",
+      "roles": ["chief", "runtime_worker"],
+      "required_for": ["chief"]
+    },
+    {
+      "name": "triage",
+      "description": "Move issue requests through a triage state machine.",
+      "source": "local-agents/skills/triage",
+      "snapshot": "snapshots/triage",
+      "roles": ["chief", "runtime_worker"],
+      "required_for": []
+    },
+    {
+      "name": "grilling",
+      "description": "Stress-test a plan through a decision tree.",
+      "source": "local-agents/skills/grilling",
+      "snapshot": "snapshots/grilling",
+      "roles": ["chief", "runtime_worker"],
+      "required_for": []
+    },
+    {
+      "name": "domain-modeling",
+      "description": "Sharpen project terms and record domain decisions.",
+      "source": "local-agents/skills/domain-modeling",
+      "snapshot": "snapshots/domain-modeling",
+      "roles": ["chief", "runtime_worker"],
+      "required_for": []
+    },
+    {
+      "name": "writing-for-agents",
+      "description": "Write clear instructions for agents and skills.",
+      "source": "local-agents/skills/writing-for-agents",
+      "snapshot": "snapshots/writing-for-agents",
+      "roles": ["chief", "runtime_worker"],
+      "required_for": []
+    },
+    {
+      "name": "diagnosing-bugs",
+      "description": "Use a diagnosis loop for difficult failures.",
+      "source": "local-agents/skills/diagnosing-bugs",
+      "snapshot": "snapshots/diagnosing-bugs",
+      "roles": ["chief", "runtime_worker"],
+      "required_for": []
+    },
+    {
+      "name": "resolving-merge-conflicts",
+      "description": "Resolve an in-progress Git merge or rebase conflict.",
+      "source": "local-agents/skills/resolving-merge-conflicts",
+      "snapshot": "snapshots/resolving-merge-conflicts",
+      "roles": ["chief", "runtime_worker"],
+      "required_for": []
+    },
+    {
+      "name": "frontend-ui-engineering",
+      "description": "Build accessible production user interfaces.",
+      "source": "local-agents/skills/frontend-ui-engineering",
+      "snapshot": "snapshots/frontend-ui-engineering",
+      "roles": ["chief", "runtime_worker"],
+      "required_for": []
+    },
+    {
+      "name": "git-guardrails-claude-code",
+      "description": "Guard against dangerous Git operations.",
+      "source": "local-agents/skills/git-guardrails-claude-code",
+      "snapshot": "snapshots/git-guardrails-claude-code",
+      "roles": ["chief", "runtime_worker"],
+      "required_for": []
+    }
+  ]
+}
